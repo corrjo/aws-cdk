@@ -80,8 +80,8 @@ interface Payload {
 }
 
 function createPayload(pipelineName: string, region: string, status: string): Payload {
-  console.log('pipelineName', status);
-  console.log('status', status);
+  console.log('pipelineName:', pipelineName);
+  console.log('status:', status);
   let description;
   if (status === 'started') {
     description = 'Build started';
