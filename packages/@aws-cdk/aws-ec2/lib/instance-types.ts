@@ -149,6 +149,36 @@ export enum InstanceClass {
   R5AD = 'r5a',
 
   /**
+   * Memory optimized instances that are also EBS-optimized, 5th generation
+   */
+  MEMORY5_EBS_OPTIMIZED = 'r5b',
+
+  /**
+   * Memory optimized instances that are also EBS-optimized, 5th generation
+   */
+  R5B = 'r5b',
+
+  /**
+   * Memory optimized instances, 6th generation with Graviton2 processors
+   */
+  MEMORY6_GRAVITON = 'r6g',
+
+  /**
+   * Memory optimized instances, 6th generation with Graviton2 processors
+   */
+  R6G = 'r6g',
+
+  /**
+   * Memory optimized instances, 6th generation with Graviton2 processors and local NVME drive
+   */
+  MEMORY6_GRAVITON2_NVME_DRIVE = 'r6gd',
+
+  /**
+   * Memory optimized instances, 6th generation with Graviton2 processors and local NVME drive
+   */
+  R6GD = 'r6gd',
+
+  /**
    * Compute optimized instances, 3rd generation
    */
   COMPUTE3 = 'c3',
@@ -184,6 +214,16 @@ export enum InstanceClass {
   COMPUTE5_NVME_DRIVE = 'c5d',
 
   /**
+   * Compute optimized instances based on AMD EPYC, 5th generation.
+   */
+  COMPUTE5_AMD = 'c5a',
+
+  /**
+   * Compute optimized instances based on AMD EPYC, 5th generation
+   */
+  C5A = 'c5a',
+
+  /**
    * Compute optimized instances with local NVME drive, 5th generation
    */
   C5D = 'c5d',
@@ -197,6 +237,28 @@ export enum InstanceClass {
    * Compute optimized instances for high performance computing, 5th generation
    */
   C5N = 'c5n',
+
+  /**
+   * Compute optimized instances for high performance computing, 6th generation with Graviton2 processors
+   */
+  COMPUTE6_GRAVITON2 = 'c6g',
+
+  /**
+   * Compute optimized instances for high performance computing, 6th generation with Graviton2 processors
+   */
+  C6G = 'c6g',
+
+  /**
+   * Compute optimized instances for high performance computing, 6th generation with Graviton2 processors
+   * and local NVME drive
+   */
+  COMPUTE6_GRAVITON2_NVME_DRIVE = 'c6gd',
+
+  /**
+   * Compute optimized instances for high performance computing, 6th generation with Graviton2 processors
+   * and local NVME drive
+   */
+  C6GD = 'c6gd',
 
   /**
    * Storage-optimized instances, 2nd generation
@@ -267,6 +329,16 @@ export enum InstanceClass {
    * Burstable instances based on AMD EPYC, 3rd generation
    */
   T3A = 't3a',
+
+  /**
+   * Burstable instances, 4th generation with Graviton2 processors
+   */
+  BURSTABLE4_GRAVITON = 't4g',
+
+  /**
+   * Burstable instances, 4th generation with Graviton2 processors
+   */
+  T4G = 't4g',
 
   /**
    * Memory-intensive instances, 1st generation
@@ -357,6 +429,16 @@ export enum InstanceClass {
    * Arm processor based instances, 2nd generation
    */
   M6G = 'm6g',
+
+  /**
+   * Standard instances, 6th generation with Graviton2 processors and local NVME drive
+   */
+  STANDARD6_GRAVITON2_NVME_DRIVE = 'm6gd',
+
+  /**
+   * Standard instances, 6th generation with Graviton2 processors and local NVME drive
+   */
+  M6GD = 'm6gd',
 
   /**
    * High memory and compute capacity instances, 1st generation

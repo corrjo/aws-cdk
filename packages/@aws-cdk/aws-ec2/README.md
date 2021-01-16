@@ -1,6 +1,6 @@
-## Amazon EC2 Construct Library
-
+# Amazon EC2 Construct Library
 <!--BEGIN STABILITY BANNER-->
+
 ---
 
 ![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
@@ -8,7 +8,9 @@
 ![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
+
 <!--END STABILITY BANNER-->
+
 
 The `@aws-cdk/aws-ec2` package contains primitives for setting up networking and
 instances.
@@ -163,6 +165,8 @@ Which subnets are selected is evaluated as follows:
     in the given availability zones will be returned.
   * `onePerAz`: per availability zone, a maximum of one subnet will be returned (Useful for resource
     types that do not allow creating two ENIs in the same availability zone).
+* `subnetFilters`: additional filtering on subnets using any number of user-provided filters which
+  extend the SubnetFilter class.
 
 ### Using NAT instances
 
@@ -279,8 +283,8 @@ const igwId = vpc.internetGatewayId;
 
 For a VPC with only `ISOLATED` subnets, this value will be undefined.
 
-This is only supported for VPC's created in the stack - currently you're
-unable to get the ID for imported VPC's. To do that you'd have to specifically
+This is only supported for VPCs created in the stack - currently you're
+unable to get the ID for imported VPCs. To do that you'd have to specifically
 look up the Internet Gateway by name, which would require knowing the name
 beforehand.
 
@@ -619,6 +623,23 @@ new VpcEndpointService(this, 'EndpointService', {
 });
 ```
 
+Endpoint services support private DNS, which makes it easier for clients to connect to your service by automatically setting up DNS in their VPC.
+You can enable private DNS on an endpoint service like so:
+
+```ts
+import { VpcEndpointServiceDomainName } from '@aws-cdk/aws-route53';
+
+new VpcEndpointServiceDomainName(stack, 'EndpointDomain', {
+  endpointService: vpces,
+  domainName: 'my-stuff.aws-cdk.dev',
+  publicHostedZone: zone,
+});
+```
+
+Note: The domain name must be owned (registered through Route53) by the account the endpoint service is in, or delegated to the account.
+The VpcEndpointServiceDomainName will handle the AWS side of domain verification, the process for which can be found
+[here](https://docs.aws.amazon.com/vpc/latest/userguide/endpoint-services-dns-validation.html)
+
 ## Instances
 
 You can use the `Instance` class to start up a single EC2 instance. For production setups, we recommend
@@ -698,7 +719,7 @@ ec2.CloudFormationInit.fromElements(
 ### Bastion Hosts
 
 A bastion host functions as an instance used to access servers and resources in a VPC without open up the complete VPC on a network level.
-You can use bastion hosts using a standard SSH connection targetting port 22 on the host. As an alternative, you can connect the SSH connection
+You can use bastion hosts using a standard SSH connection targeting port 22 on the host. As an alternative, you can connect the SSH connection
 feature of AWS Systems Manager Session Manager, which does not need an opened security group. (https://aws.amazon.com/about-aws/whats-new/2019/07/session-manager-launches-tunneling-support-for-ssh-and-scp/)
 
 A default bastion host for use via SSM can be configured like:
@@ -736,14 +757,14 @@ EBS volume for the bastion host can be encrypted like:
 
 ### Block Devices
 
-To add EBS block device mappings, specify the `blockDeviceMappings` property. The follow example sets the EBS-backed
+To add EBS block device mappings, specify the `blockDevices` property. The following example sets the EBS-backed
 root device (`/dev/sda1`) size to 50 GiB, and adds another EBS-backed device mapped to `/dev/sdm` that is 100 GiB in
 size:
 
 ```ts
 new ec2.Instance(this, 'Instance', {
   // ...
-  blockDeviceMappings: [
+  blockDevices: [
     {
       deviceName: '/dev/sda1',
       volume: ec2.BlockDeviceVolume.ebs(50),
@@ -891,6 +912,11 @@ const bucket = new s3.Bucket(this, 'MyCustomBucket');
 new ec2.FlowLog(this, 'FlowLog', {
   resourceType: ec2.FlowLogResourceType.fromVpc(vpc),
   destination: ec2.FlowLogDestination.toS3(bucket)
+});
+
+new ec2.FlowLog(this, 'FlowLogWithKeyPrefix', {
+  resourceType: ec2.FlowLogResourceType.fromVpc(vpc),
+  destination: ec2.FlowLogDestination.toS3(bucket, 'prefix/')
 });
 ```
 

@@ -1,7 +1,7 @@
 import { ABSENT } from '@aws-cdk/assert';
 import '@aws-cdk/assert/jest';
-import { Stack } from '@aws-cdk/core';
-import { OAuthScope, UserPool, UserPoolClient, UserPoolClientIdentityProvider, UserPoolIdentityProvider } from '../lib';
+import { Stack, Duration } from '@aws-cdk/core';
+import { OAuthScope, ResourceServerScope, UserPool, UserPoolClient, UserPoolClientIdentityProvider, UserPoolIdentityProvider } from '../lib';
 
 describe('User Pool Client', () => {
   test('default setup', () => {
@@ -78,7 +78,6 @@ describe('User Pool Client', () => {
       authFlows: {
         adminUserPassword: true,
         custom: true,
-        refreshToken: true,
         userPassword: true,
         userSrp: true,
       },
@@ -89,6 +88,26 @@ describe('User Pool Client', () => {
         'ALLOW_USER_PASSWORD_AUTH',
         'ALLOW_ADMIN_USER_PASSWORD_AUTH',
         'ALLOW_CUSTOM_AUTH',
+        'ALLOW_USER_SRP_AUTH',
+        'ALLOW_REFRESH_TOKEN_AUTH',
+      ],
+    });
+  });
+
+  test('ExplicitAuthFlows makes refreshToken true by default', () => {
+    // GIVEN
+    const stack = new Stack();
+    const pool = new UserPool(stack, 'Pool');
+
+    // WHEN
+    pool.addClient('Client', {
+      authFlows: {
+        userSrp: true,
+      },
+    });
+
+    expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+      ExplicitAuthFlows: [
         'ALLOW_USER_SRP_AUTH',
         'ALLOW_REFRESH_TOKEN_AUTH',
       ],
@@ -175,6 +194,23 @@ describe('User Pool Client', () => {
     });
   });
 
+  test('callbackUrls are not rendered if OAuth is disabled ', () => {
+    // GIVEN
+    const stack = new Stack();
+    const pool = new UserPool(stack, 'Pool');
+
+    // WHEN
+    new UserPoolClient(stack, 'PoolClient', {
+      userPool: pool,
+      disableOAuth: true,
+    });
+
+    // THEN
+    expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+      CallbackURLs: ABSENT,
+    });
+  });
+
   test('fails when callbackUrls is empty for codeGrant or implicitGrant', () => {
     const stack = new Stack();
     const pool = new UserPool(stack, 'Pool');
@@ -199,6 +235,21 @@ describe('User Pool Client', () => {
         callbackUrls: [],
       },
     })).not.toThrow();
+  });
+
+  test('logoutUrls can be set', () => {
+    const stack = new Stack();
+    const pool = new UserPool(stack, 'Pool');
+
+    pool.addClient('Client', {
+      oAuth: {
+        logoutUrls: ['https://example.com'],
+      },
+    });
+
+    expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+      LogoutURLs: ['https://example.com'],
+    });
   });
 
   test('fails when clientCredentials OAuth flow is selected along with codeGrant or implicitGrant', () => {
@@ -255,6 +306,41 @@ describe('User Pool Client', () => {
         'profile',
         'aws.cognito.signin.user.admin',
         'my-resource-server/my-own-scope',
+      ],
+    });
+  });
+
+  test('OAuth scopes - resource server', () => {
+    // GIVEN
+    const stack = new Stack();
+    const pool = new UserPool(stack, 'Pool');
+    const scope = new ResourceServerScope({ scopeName: 'scope-name', scopeDescription: 'scope-desc' });
+    const resourceServer = pool.addResourceServer('ResourceServer', {
+      identifier: 'resource-server',
+      scopes: [scope],
+    });
+
+    // WHEN
+    pool.addClient('Client', {
+      oAuth: {
+        flows: { clientCredentials: true },
+        scopes: [
+          OAuthScope.resourceServer(resourceServer, scope),
+        ],
+      },
+    });
+
+    // THEN
+    expect(stack).toHaveResource('AWS::Cognito::UserPoolClient', {
+      AllowedOAuthScopes: [
+        {
+          'Fn::Join': [
+            '', [
+              stack.resolve(resourceServer.userPoolResourceServerId),
+              '/scope-name',
+            ],
+          ],
+        },
       ],
     });
   });
@@ -400,13 +486,14 @@ describe('User Pool Client', () => {
         UserPoolClientIdentityProvider.COGNITO,
         UserPoolClientIdentityProvider.FACEBOOK,
         UserPoolClientIdentityProvider.AMAZON,
+        UserPoolClientIdentityProvider.GOOGLE,
       ],
     });
 
     // THEN
     expect(stack).toHaveResource('AWS::Cognito::UserPoolClient', {
       ClientName: 'AllEnabled',
-      SupportedIdentityProviders: ['COGNITO', 'Facebook', 'LoginWithAmazon'],
+      SupportedIdentityProviders: ['COGNITO', 'Facebook', 'LoginWithAmazon', 'Google'],
     });
   });
 
@@ -452,5 +539,292 @@ describe('User Pool Client', () => {
         },
       },
     })).toThrow(/disableOAuth is set/);
+  });
+
+  describe('token validity', () => {
+    test('default', () => {
+      // GIVEN
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+
+      // WHEN
+      pool.addClient('Client1', {
+        userPoolClientName: 'Client1',
+        accessTokenValidity: Duration.minutes(60),
+        idTokenValidity: Duration.minutes(60),
+        refreshTokenValidity: Duration.days(30),
+      });
+      pool.addClient('Client2', {
+        userPoolClientName: 'Client2',
+        accessTokenValidity: Duration.minutes(60),
+      });
+      pool.addClient('Client3', {
+        userPoolClientName: 'Client3',
+        idTokenValidity: Duration.minutes(60),
+      });
+      pool.addClient('Client4', {
+        userPoolClientName: 'Client4',
+        refreshTokenValidity: Duration.days(30),
+      });
+      pool.addClient('Client5', {
+        userPoolClientName: 'Client5',
+      });
+
+      // THEN
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client1',
+        AccessTokenValidity: 60,
+        IdTokenValidity: 60,
+        RefreshTokenValidity: 43200,
+        TokenValidityUnits: {
+          AccessToken: 'minutes',
+          IdToken: 'minutes',
+          RefreshToken: 'minutes',
+        },
+      });
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client2',
+        AccessTokenValidity: 60,
+        IdTokenValidity: ABSENT,
+        RefreshTokenValidity: ABSENT,
+        TokenValidityUnits: {
+          AccessToken: 'minutes',
+          IdToken: ABSENT,
+          RefreshToken: ABSENT,
+        },
+      });
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client3',
+        AccessTokenValidity: ABSENT,
+        IdTokenValidity: 60,
+        RefreshTokenValidity: ABSENT,
+        TokenValidityUnits: {
+          AccessToken: ABSENT,
+          IdToken: 'minutes',
+          RefreshToken: ABSENT,
+        },
+      });
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client4',
+        AccessTokenValidity: ABSENT,
+        IdTokenValidity: ABSENT,
+        RefreshTokenValidity: 43200,
+        TokenValidityUnits: {
+          AccessToken: ABSENT,
+          IdToken: ABSENT,
+          RefreshToken: 'minutes',
+        },
+      });
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client5',
+        TokenValidityUnits: ABSENT,
+        IdTokenValidity: ABSENT,
+        RefreshTokenValidity: ABSENT,
+        AccessTokenValidity: ABSENT,
+      });
+    });
+
+    test.each([
+      Duration.minutes(0),
+      Duration.minutes(4),
+      Duration.days(1).plus(Duration.minutes(1)),
+      Duration.days(2),
+    ])('validates accessTokenValidity is a duration between 5 minutes and 1 day', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+      expect(() => {
+        pool.addClient('Client1', {
+          userPoolClientName: 'Client1',
+          accessTokenValidity: validity,
+        });
+      }).toThrow(`accessTokenValidity: Must be a duration between 5 minutes and 1 day (inclusive); received ${validity.toHumanString()}.`);
+    });
+
+    test.each([
+      Duration.minutes(0),
+      Duration.minutes(4),
+      Duration.days(1).plus(Duration.minutes(1)),
+      Duration.days(2),
+    ])('validates idTokenValidity is a duration between 5 minutes and 1 day', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+      expect(() => {
+        pool.addClient('Client1', {
+          userPoolClientName: 'Client1',
+          idTokenValidity: validity,
+        });
+      }).toThrow(`idTokenValidity: Must be a duration between 5 minutes and 1 day (inclusive); received ${validity.toHumanString()}.`);
+    });
+
+    test.each([
+      Duration.hours(1).plus(Duration.minutes(1)),
+      Duration.hours(12),
+      Duration.days(1),
+    ])('validates accessTokenValidity is not greater than refresh token expiration', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+      expect(() => {
+        pool.addClient('Client1', {
+          userPoolClientName: 'Client1',
+          accessTokenValidity: validity,
+          refreshTokenValidity: Duration.hours(1),
+        });
+      }).toThrow(`accessTokenValidity: Must be a duration between 5 minutes and 60 minutes (inclusive); received ${validity.toHumanString()}.`);
+    });
+
+    test.each([
+      Duration.hours(1).plus(Duration.minutes(1)),
+      Duration.hours(12),
+      Duration.days(1),
+    ])('validates idTokenValidity is not greater than refresh token expiration', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+      expect(() => {
+        pool.addClient('Client1', {
+          userPoolClientName: 'Client1',
+          idTokenValidity: validity,
+          refreshTokenValidity: Duration.hours(1),
+        });
+      }).toThrow(`idTokenValidity: Must be a duration between 5 minutes and 60 minutes (inclusive); received ${validity.toHumanString()}.`);
+    });
+
+    test.each([
+      Duration.minutes(0),
+      Duration.minutes(59),
+      Duration.days(10 * 365).plus(Duration.minutes(1)),
+      Duration.days(10 * 365 + 1),
+    ])('validates refreshTokenValidity is a duration between 60 minutes and 10 years', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+      expect(() => {
+        pool.addClient('Client1', {
+          userPoolClientName: 'Client1',
+          refreshTokenValidity: validity,
+        });
+      }).toThrow(`refreshTokenValidity: Must be a duration between 60 minutes and 3650 days (inclusive); received ${validity.toHumanString()}.`);
+    });
+
+    test.each([
+      Duration.minutes(5),
+      Duration.minutes(60),
+      Duration.days(1),
+    ])('validates accessTokenValidity is a duration between 5 minutes and 1 day (valid)', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+
+      // WHEN
+      pool.addClient('Client1', {
+        userPoolClientName: 'Client1',
+        accessTokenValidity: validity,
+      });
+
+      // THEN
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client1',
+        AccessTokenValidity: validity.toMinutes(),
+        TokenValidityUnits: {
+          AccessToken: 'minutes',
+        },
+      });
+    });
+
+    test.each([
+      Duration.minutes(5),
+      Duration.minutes(60),
+      Duration.days(1),
+    ])('validates idTokenValidity is a duration between 5 minutes and 1 day (valid)', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+
+      // WHEN
+      pool.addClient('Client1', {
+        userPoolClientName: 'Client1',
+        idTokenValidity: validity,
+      });
+
+      // THEN
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client1',
+        IdTokenValidity: validity.toMinutes(),
+        TokenValidityUnits: {
+          IdToken: 'minutes',
+        },
+      });
+    });
+
+    test.each([
+      Duration.minutes(60),
+      Duration.minutes(120),
+      Duration.days(365),
+      Duration.days(10 * 365),
+    ])('validates refreshTokenValidity is a duration between 60 minutes and 10 years (valid)', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+
+      // WHEN
+      pool.addClient('Client1', {
+        userPoolClientName: 'Client1',
+        refreshTokenValidity: validity,
+      });
+
+      // THEN
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client1',
+        RefreshTokenValidity: validity.toMinutes(),
+        TokenValidityUnits: {
+          RefreshToken: 'minutes',
+        },
+      });
+    });
+
+    test.each([
+      Duration.minutes(5),
+      Duration.minutes(60),
+      Duration.hours(1),
+    ])('validates accessTokenValidity is not greater than refresh token expiration (valid)', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+
+      // WHEN
+      pool.addClient('Client1', {
+        userPoolClientName: 'Client1',
+        accessTokenValidity: validity,
+        refreshTokenValidity: Duration.hours(1),
+      });
+
+      // THEN
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client1',
+        AccessTokenValidity: validity.toMinutes(),
+        TokenValidityUnits: {
+          AccessToken: 'minutes',
+        },
+      });
+    });
+
+    test.each([
+      Duration.minutes(5),
+      Duration.minutes(60),
+      Duration.hours(1),
+    ])('validates idTokenValidity is not greater than refresh token expiration (valid)', (validity) => {
+      const stack = new Stack();
+      const pool = new UserPool(stack, 'Pool');
+
+      // WHEN
+      pool.addClient('Client1', {
+        userPoolClientName: 'Client1',
+        idTokenValidity: validity,
+        refreshTokenValidity: Duration.hours(1),
+      });
+
+      // THEN
+      expect(stack).toHaveResourceLike('AWS::Cognito::UserPoolClient', {
+        ClientName: 'Client1',
+        IdTokenValidity: validity.toMinutes(),
+        TokenValidityUnits: {
+          IdToken: 'minutes',
+        },
+      });
+    });
   });
 });

@@ -4,17 +4,24 @@ import * as iam from '@aws-cdk/aws-iam';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as logs from '@aws-cdk/aws-logs';
 import * as cdk from '@aws-cdk/core';
+import { Construct } from 'constructs';
+import { PHYSICAL_RESOURCE_ID_REFERENCE, flatten } from './runtime';
 
-// don't use "require" since the typescript compiler emits errors since this
-// file is not listed in tsconfig.json.
-const metadata = JSON.parse(fs.readFileSync(path.join(__dirname, 'sdk-api-metadata.json'), 'utf-8'));
+// keep this import separate from other imports to reduce chance for merge conflicts with v2-main
+// eslint-disable-next-line no-duplicate-imports, import/order
+import { Construct as CoreConstruct } from '@aws-cdk/core';
 
 /**
- * AWS SDK service metadata.
+ * Reference to the physical resource id that can be passed to the AWS operation as a parameter.
  */
-export type AwsSdkMetadata = {[key: string]: any};
-
-const awsSdkMetadata: AwsSdkMetadata = metadata;
+export class PhysicalResourceIdReference {
+  /**
+   * toJSON serialization to replace `PhysicalResourceIdReference` with a magic string.
+   */
+  public toJSON() {
+    return PHYSICAL_RESOURCE_ID_REFERENCE;
+  }
+}
 
 /**
  * Physical ID of the custom resource.
@@ -271,7 +278,7 @@ export interface AwsCustomResourceProps {
  * You can specify exactly which calls are invoked for the 'CREATE', 'UPDATE' and 'DELETE' life cycle events.
  *
  */
-export class AwsCustomResource extends cdk.Construct implements iam.IGrantable {
+export class AwsCustomResource extends CoreConstruct implements iam.IGrantable {
 
   private static breakIgnoreErrorsCircuit(sdkCalls: Array<AwsSdkCall | undefined>, caller: string) {
 
@@ -290,7 +297,7 @@ export class AwsCustomResource extends cdk.Construct implements iam.IGrantable {
 
   // 'props' cannot be optional, even though all its properties are optional.
   // this is because at least one sdk call must be provided.
-  constructor(scope: cdk.Construct, id: string, props: AwsCustomResourceProps) {
+  constructor(scope: Construct, id: string, props: AwsCustomResourceProps) {
     super(scope, id);
 
     if (!props.onCreate && !props.onUpdate && !props.onDelete) {
@@ -306,6 +313,15 @@ export class AwsCustomResource extends cdk.Construct implements iam.IGrantable {
     for (const call of [props.onCreate, props.onUpdate, props.onDelete]) {
       if (call?.physicalResourceId?.responsePath) {
         AwsCustomResource.breakIgnoreErrorsCircuit([call], 'PhysicalResourceId.fromResponse');
+      }
+    }
+
+    if (props.onCreate?.parameters) {
+      const flattenedOnCreateParams = flatten(JSON.parse(JSON.stringify(props.onCreate.parameters)));
+      for (const param in flattenedOnCreateParams) {
+        if (flattenedOnCreateParams[param] === PHYSICAL_RESOURCE_ID_REFERENCE) {
+          throw new Error('`PhysicalResourceIdReference` must not be specified in `onCreate` parameters.');
+        }
       }
     }
 
@@ -405,6 +421,25 @@ export class AwsCustomResource extends cdk.Construct implements iam.IGrantable {
 }
 
 /**
+ * AWS SDK service metadata.
+ */
+export type AwsSdkMetadata = {[key: string]: any};
+
+/**
+ * Gets awsSdkMetaData from file or from cache
+ */
+let getAwsSdkMetadata = (() => {
+  let _awsSdkMetadata: AwsSdkMetadata;
+  return function () {
+    if (_awsSdkMetadata) {
+      return _awsSdkMetadata;
+    } else {
+      return _awsSdkMetadata = JSON.parse(fs.readFileSync(path.join(__dirname, 'sdk-api-metadata.json'), 'utf-8'));
+    }
+  };
+})();
+
+/**
  * Transform SDK service/action to IAM action using metadata from aws-sdk module.
  * Example: CloudWatchLogs with putRetentionPolicy => logs:PutRetentionPolicy
  *
@@ -412,6 +447,7 @@ export class AwsCustomResource extends cdk.Construct implements iam.IGrantable {
  */
 function awsSdkToIamAction(service: string, action: string): string {
   const srv = service.toLowerCase();
+  const awsSdkMetadata = getAwsSdkMetadata();
   const iamService = (awsSdkMetadata[srv] && awsSdkMetadata[srv].prefix) || srv;
   const iamAction = action.charAt(0).toUpperCase() + action.slice(1);
   return `${iamService}:${iamAction}`;

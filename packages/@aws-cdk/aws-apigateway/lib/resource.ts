@@ -1,4 +1,5 @@
-import { Construct, IResource as IResourceBase, Resource as ResourceConstruct } from '@aws-cdk/core';
+import { IResource as IResourceBase, Resource as ResourceConstruct } from '@aws-cdk/core';
+import { Construct } from 'constructs';
 import { CfnResource, CfnResourceProps } from './apigateway.generated';
 import { Cors, CorsOptions } from './cors';
 import { Integration } from './integration';
@@ -36,7 +37,7 @@ export interface IResource extends IResourceBase {
   readonly resourceId: string;
 
   /**
-   * The full path of this resuorce.
+   * The full path of this resource.
    */
   readonly path: string;
 

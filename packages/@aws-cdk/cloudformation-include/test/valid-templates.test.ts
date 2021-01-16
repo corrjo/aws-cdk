@@ -3,7 +3,9 @@ import { ResourcePart } from '@aws-cdk/assert';
 import '@aws-cdk/assert/jest';
 import * as iam from '@aws-cdk/aws-iam';
 import * as s3 from '@aws-cdk/aws-s3';
+import * as ssm from '@aws-cdk/aws-ssm';
 import * as core from '@aws-cdk/core';
+import * as constructs from 'constructs';
 import * as inc from '../lib';
 import * as futils from '../lib/file-utils';
 
@@ -213,11 +215,29 @@ describe('CDK Include', () => {
     );
   });
 
+  test('can correctly ingest a resource with a property of type: Map of Lists of primitive types', () => {
+    const cfnTemplate = includeTestTemplate(stack, 'ssm-association.json');
+
+    expect(stack).toMatchTemplate(
+      loadTestFileToJsObject('ssm-association.json'),
+    );
+    const association = cfnTemplate.getResource('Association') as ssm.CfnAssociation;
+    expect(Object.keys(association.parameters as any)).toHaveLength(2);
+  });
+
   test('can ingest a template with intrinsic functions and conditions, and output it unchanged', () => {
     includeTestTemplate(stack, 'functions-and-conditions.json');
 
     expect(stack).toMatchTemplate(
       loadTestFileToJsObject('functions-and-conditions.json'),
+    );
+  });
+
+  test('can ingest a JSON template with string-form Fn::GetAtt, and output it unchanged', () => {
+    includeTestTemplate(stack, 'get-att-string-form.json');
+
+    expect(stack).toMatchTemplate(
+      loadTestFileToJsObject('get-att-string-form.json'),
     );
   });
 
@@ -757,6 +777,14 @@ describe('CDK Include', () => {
     });
   });
 
+  test('can ingest a template that uses Fn::FindInMap for the value of a boolean property', () => {
+    includeTestTemplate(stack, 'find-in-map-for-boolean-property.json');
+
+    expect(stack).toMatchTemplate(
+      loadTestFileToJsObject('find-in-map-for-boolean-property.json'),
+    );
+  });
+
   test('can ingest a template that contains Rules, and allows retrieving those Rules', () => {
     const cfnTemplate = includeTestTemplate(stack, 'only-parameters-and-rule.json');
     const rule = cfnTemplate.getRule('TestVpcRule');
@@ -971,6 +999,14 @@ describe('CDK Include', () => {
       });
     }).toThrow(/Parameter with logical ID 'FakeParameter' was not found in the template/);
   });
+
+  test('can ingest a template that contains properties not in the current CFN spec, and output it unchanged', () => {
+    includeTestTemplate(stack, 'properties-not-in-cfn-spec.json');
+
+    expect(stack).toMatchTemplate(
+      loadTestFileToJsObject('properties-not-in-cfn-spec.json'),
+    );
+  });
 });
 
 interface IncludeTestTemplateProps {
@@ -981,7 +1017,7 @@ interface IncludeTestTemplateProps {
   readonly parameters?: { [parameterName: string]: any }
 }
 
-function includeTestTemplate(scope: core.Construct, testTemplate: string, props: IncludeTestTemplateProps = {}): inc.CfnInclude {
+function includeTestTemplate(scope: constructs.Construct, testTemplate: string, props: IncludeTestTemplateProps = {}): inc.CfnInclude {
   return new inc.CfnInclude(scope, 'MyScope', {
     templateFile: _testTemplateFilePath(testTemplate),
     parameters: props.parameters,

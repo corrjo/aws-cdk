@@ -1,5 +1,6 @@
 import * as ec2 from '@aws-cdk/aws-ec2';
-import { Construct, Lazy, Resource, Stack } from '@aws-cdk/core';
+import { Lazy, Resource, Stack } from '@aws-cdk/core';
+import { Construct } from 'constructs';
 import { BaseService, BaseServiceOptions, DeploymentControllerType, IBaseService, IService, LaunchType, PropagatedTagSource } from '../base/base-service';
 import { fromServiceAtrributes } from '../base/from-service-attributes';
 import { NetworkMode, TaskDefinition } from '../base/task-definition';
@@ -185,8 +186,7 @@ export class Ec2Service extends BaseService implements IEc2Service {
 
     super(scope, id, {
       ...props,
-      // If daemon, desiredCount must be undefined and that's what we want. Otherwise, default to 1.
-      desiredCount: props.daemon || props.desiredCount !== undefined ? props.desiredCount : 1,
+      desiredCount: props.desiredCount,
       maxHealthyPercent: props.daemon && props.maxHealthyPercent === undefined ? 100 : props.maxHealthyPercent,
       minHealthyPercent: props.daemon && props.minHealthyPercent === undefined ? 0 : props.minHealthyPercent,
       launchType: LaunchType.EC2,
@@ -196,8 +196,8 @@ export class Ec2Service extends BaseService implements IEc2Service {
     {
       cluster: props.cluster.clusterName,
       taskDefinition: props.deploymentController?.type === DeploymentControllerType.EXTERNAL ? undefined : props.taskDefinition.taskDefinitionArn,
-      placementConstraints: Lazy.anyValue({ produce: () => this.constraints }, { omitEmptyArray: true }),
-      placementStrategies: Lazy.anyValue({ produce: () => this.strategies }, { omitEmptyArray: true }),
+      placementConstraints: Lazy.any({ produce: () => this.constraints }, { omitEmptyArray: true }),
+      placementStrategies: Lazy.any({ produce: () => this.strategies }, { omitEmptyArray: true }),
       schedulingStrategy: props.daemon ? 'DAEMON' : 'REPLICA',
     }, props.taskDefinition);
 
