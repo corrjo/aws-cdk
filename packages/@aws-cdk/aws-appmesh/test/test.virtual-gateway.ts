@@ -306,7 +306,9 @@ export = {
         mesh: mesh,
       });
 
-      const virtualService = mesh.addVirtualService('virtualService', {});
+      const virtualService = new appmesh.VirtualService(stack, 'virtualService', {
+        virtualServiceProvider: appmesh.VirtualServiceProvider.none(mesh),
+      });
 
       virtualGateway.addGatewayRoute('testGatewayRoute', {
         gatewayRouteName: 'test-gateway-route',
@@ -324,7 +326,7 @@ export = {
               Target: {
                 VirtualService: {
                   VirtualServiceName: {
-                    'Fn::GetAtt': ['meshvirtualService93460D43', 'VirtualServiceName'],
+                    'Fn::GetAtt': ['virtualService03A04B87', 'VirtualServiceName'],
                   },
                 },
               },
@@ -349,7 +351,9 @@ export = {
         meshName: 'test-mesh',
       });
 
-      const virtualService = mesh.addVirtualService('virtualService', {});
+      const virtualService = new appmesh.VirtualService(stack, 'virtualService', {
+        virtualServiceProvider: appmesh.VirtualServiceProvider.none(mesh),
+      });
 
       const virtualGateway = mesh.addVirtualGateway('gateway');
       virtualGateway.addGatewayRoute('testGatewayRoute', {
@@ -388,9 +392,11 @@ export = {
       new appmesh.VirtualGateway(stack, 'virtual-gateway', {
         virtualGatewayName: 'virtual-gateway',
         mesh: mesh,
-        backendsDefaultClientPolicy: appmesh.ClientPolicy.fileTrust({
-          certificateChain: 'path-to-certificate',
-        }),
+        backendDefaults: {
+          clientPolicy: appmesh.ClientPolicy.fileTrust({
+            certificateChain: 'path-to-certificate',
+          }),
+        },
       });
 
       // THEN

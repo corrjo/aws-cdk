@@ -19,20 +19,20 @@ export = {
 
         const service1 = new appmesh.VirtualService(stack, 'service-1', {
           virtualServiceName: 'service1.domain.local',
-          mesh,
+          virtualServiceProvider: appmesh.VirtualServiceProvider.none(mesh),
         });
         const service2 = new appmesh.VirtualService(stack, 'service-2', {
           virtualServiceName: 'service2.domain.local',
-          mesh,
+          virtualServiceProvider: appmesh.VirtualServiceProvider.none(mesh),
         });
 
         const node = new appmesh.VirtualNode(stack, 'test-node', {
           mesh,
           serviceDiscovery: appmesh.ServiceDiscovery.dns('test'),
-          backends: [service1],
+          backends: [appmesh.Backend.virtualService(service1)],
         });
 
-        node.addBackend(service2);
+        node.addBackend(appmesh.Backend.virtualService(service2));
 
         // THEN
         expect(stack).to(haveResourceLike('AWS::AppMesh::VirtualNode', {
@@ -272,10 +272,12 @@ export = {
         new appmesh.VirtualNode(stack, 'test-node', {
           mesh,
           serviceDiscovery: appmesh.ServiceDiscovery.dns('test'),
-          backendsDefaultClientPolicy: appmesh.ClientPolicy.acmTrust({
-            certificateAuthorities: [acmpca.CertificateAuthority.fromCertificateAuthorityArn(stack, 'certificate', certificateAuthorityArn)],
-            ports: [8080, 8081],
-          }),
+          backendDefaults: {
+            clientPolicy: appmesh.ClientPolicy.acmTrust({
+              certificateAuthorities: [acmpca.CertificateAuthority.fromCertificateAuthorityArn(stack, 'certificate', certificateAuthorityArn)],
+              ports: [8080, 8081],
+            }),
+          },
         });
 
         // THEN
@@ -319,14 +321,15 @@ export = {
 
         const service1 = new appmesh.VirtualService(stack, 'service-1', {
           virtualServiceName: 'service1.domain.local',
-          mesh,
+          virtualServiceProvider: appmesh.VirtualServiceProvider.none(mesh),
+        });
+
+        node.addBackend(appmesh.Backend.virtualService(service1, {
           clientPolicy: appmesh.ClientPolicy.fileTrust({
             certificateChain: 'path-to-certificate',
             ports: [8080, 8081],
           }),
-        });
-
-        node.addBackend(service1);
+        }));
 
         // THEN
         expect(stack).to(haveResourceLike('AWS::AppMesh::VirtualNode', {
