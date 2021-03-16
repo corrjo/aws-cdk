@@ -104,6 +104,9 @@ export const S3_GRANT_WRITE_WITHOUT_ACL = '@aws-cdk/aws-s3:grantWriteWithoutAcl'
  */
 export const ECS_REMOVE_DEFAULT_DESIRED_COUNT = '@aws-cdk/aws-ecs-patterns:removeDefaultDesiredCount';
 
+// TODO WRITEME
+export const LOOSE_CROSS_STACK_REF = '@aws-cdk/core:looseCrossStackRefs';
+
 /**
  * This map includes context keys and values for feature flags that enable
  * capabilities "from the future", which we could not introduce as the default
@@ -126,6 +129,7 @@ export const FUTURE_FLAGS: { [key: string]: any } = {
   [KMS_DEFAULT_KEY_POLICIES]: true,
   [S3_GRANT_WRITE_WITHOUT_ACL]: true,
   [ECS_REMOVE_DEFAULT_DESIRED_COUNT]: true,
+  [LOOSE_CROSS_STACK_REF]: true,
 
   // We will advertise this flag when the feature is complete
   // [NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: 'true',
@@ -152,6 +156,7 @@ const FUTURE_FLAGS_DEFAULTS: { [key: string]: boolean } = {
   [KMS_DEFAULT_KEY_POLICIES]: false,
   [S3_GRANT_WRITE_WITHOUT_ACL]: false,
   [ECS_REMOVE_DEFAULT_DESIRED_COUNT]: false,
+  [LOOSE_CROSS_STACK_REF]: false,
 };
 
 export function futureFlagDefault(flag: string): boolean {

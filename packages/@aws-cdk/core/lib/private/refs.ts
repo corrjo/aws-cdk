@@ -1,3 +1,6 @@
+import * as cxapi from '@aws-cdk/cx-api';
+import * as ssm from '@aws-cdk/aws-ssm';
+
 // ----------------------------------------------------
 // CROSS REFERENCES
 // ----------------------------------------------------
@@ -14,6 +17,7 @@ import { Token, Tokenization } from '../token';
 import { CfnReference } from './cfn-reference';
 import { Intrinsic } from './intrinsic';
 import { findTokens } from './resolve';
+import { FeatureFlags } from '../feature-flags';
 
 /**
  * This is called from the App level to resolve all references defined. Each
@@ -46,14 +50,17 @@ function resolveValue(consumer: Stack, reference: CfnReference): IResolvable {
 
   // unsupported: stacks from different apps
   if (producer.node.root !== consumer.node.root) {
-    throw new Error('Cannot reference across apps. Consuming and producing stacks must be defined within the same CDK app.');
+    throw new Error(
+      'Cannot reference across apps. Consuming and producing stacks must be defined within the same CDK app.',
+    );
   }
 
   // unsupported: stacks are not in the same environment
   if (producer.environment !== consumer.environment) {
     throw new Error(
       `Stack "${consumer.node.path}" cannot consume a cross reference from stack "${producer.node.path}". ` +
-      'Cross stack references are only supported for stacks deployed to the same environment or between nested stacks and their parent stack');
+        'Cross stack references are only supported for stacks deployed to the same environment or between nested stacks and their parent stack',
+    );
   }
 
   // ----------------------------------------------------------------------
@@ -97,19 +104,22 @@ function resolveValue(consumer: Stack, reference: CfnReference): IResolvable {
   // add a dependency between the producer and the consumer. dependency logic
   // will take care of applying the dependency at the right level (e.g. the
   // top-level stacks).
-  consumer.addDependency(producer,
-    `${consumer.node.path} -> ${reference.target.node.path}.${reference.displayName}`);
+  consumer.addDependency(producer, `${consumer.node.path} -> ${reference.target.node.path}.${reference.displayName}`);
 
-  return createImportValue(reference);
+  // TODO: Put new feature behind feature flag
+  // re: https://github.com/aws/aws-cdk/pull/11918
+  const looseReferenceFeatureEnabled = FeatureFlags.of(consumer).isEnabled(cxapi.LOOSE_CROSS_STACK_REF);
+
+  return createParameterStoreGet(consumer, reference);
+  //return createImportValue(reference);
 }
 
 /**
  * Finds all the CloudFormation references in a construct tree.
  */
 function findAllReferences(root: IConstruct) {
-  const result = new Array<{ source: CfnElement, value: CfnReference }>();
+  const result = new Array<{ source: CfnElement; value: CfnReference }>();
   for (const consumer of root.node.findAll()) {
-
     // include only CfnElements (i.e. resources)
     if (!CfnElement.isCfnElement(consumer)) {
       continue;
@@ -121,7 +131,6 @@ function findAllReferences(root: IConstruct) {
       // iterate over all the tokens (e.g. intrinsic functions, lazies, etc) that
       // were found in the cloudformation representation of this resource.
       for (const token of tokens) {
-
         // include only CfnReferences (i.e. "Ref" and "Fn::GetAtt")
         if (!CfnReference.isCfnReference(token)) {
           continue;
@@ -154,6 +163,26 @@ function findAllReferences(root: IConstruct) {
 }
 
 // ------------------------------------------------------------------------------------------------
+// parmaterstore put/get
+// ------------------------------------------------------------------------------------------------
+/*
+ * use paramter store as a way of storing and retrieving values
+ */
+
+function createParameterStoreGet(consumer: Stack, reference: Reference): IResolvable {
+  const stack = Stack.of(reference.target);
+  new ssm.StringParameter(stack, 'parameter', {
+    parameterName: `/cdk/${stack.stackName}/${reference.displayName}`,
+    stringValue: Token.asString(reference),
+  });
+  //new ssm.StringParameter.valueForStringParameter(stack, `/cdk/${stack.stackName}/${reference.displayName}`);
+  return new CfnParameter(consumer, 'id', {
+    type: 'AWS::SSM::Parameter::Value<String>',
+    default: `/cdk/${stack.stackName}/${reference.displayName}`,
+  });
+}
+
+// ------------------------------------------------------------------------------------------------
 // export/import
 // ------------------------------------------------------------------------------------------------
 
@@ -180,7 +209,7 @@ function createImportValue(reference: Reference): Intrinsic {
  */
 function createNestedStackParameter(nested: Stack, reference: CfnReference, value: IResolvable) {
   // we call "this.resolve" to ensure that tokens do not creep in (for example, if the reference display name includes tokens)
-  const paramId = nested.resolve(`reference-to-${ Names.nodeUniqueId(reference.target.node)}.${reference.displayName}`);
+  const paramId = nested.resolve(`reference-to-${Names.nodeUniqueId(reference.target.node)}.${reference.displayName}`);
   let param = nested.node.tryFindChild(paramId) as CfnParameter;
   if (!param) {
     param = new CfnParameter(nested, paramId, { type: 'String' });
@@ -222,7 +251,9 @@ function createNestedStackOutput(producer: Stack, reference: Reference): CfnRefe
 export function referenceNestedStackValueInParent(reference: Reference, targetStack: Stack) {
   let currentStack = Stack.of(reference.target);
   if (currentStack !== targetStack && !isNested(currentStack, targetStack)) {
-    throw new Error(`Referenced resource must be in stack '${targetStack.node.path}', got '${reference.target.node.path}'`);
+    throw new Error(
+      `Referenced resource must be in stack '${targetStack.node.path}', got '${reference.target.node.path}'`,
+    );
   }
 
   while (currentStack !== targetStack) {
