@@ -1,5 +1,5 @@
-import * as cxapi from '@aws-cdk/cx-api';
 import * as ssm from '@aws-cdk/aws-ssm';
+import * as cxapi from '@aws-cdk/cx-api';
 
 // ----------------------------------------------------
 // CROSS REFERENCES
@@ -9,6 +9,7 @@ import { CfnElement } from '../cfn-element';
 import { CfnOutput } from '../cfn-output';
 import { CfnParameter } from '../cfn-parameter';
 import { IConstruct } from '../construct-compat';
+import { FeatureFlags } from '../feature-flags';
 import { Names } from '../names';
 import { Reference } from '../reference';
 import { IResolvable } from '../resolvable';
@@ -17,7 +18,6 @@ import { Token, Tokenization } from '../token';
 import { CfnReference } from './cfn-reference';
 import { Intrinsic } from './intrinsic';
 import { findTokens } from './resolve';
-import { FeatureFlags } from '../feature-flags';
 
 /**
  * This is called from the App level to resolve all references defined. Each
@@ -106,12 +106,12 @@ function resolveValue(consumer: Stack, reference: CfnReference): IResolvable {
   // top-level stacks).
   consumer.addDependency(producer, `${consumer.node.path} -> ${reference.target.node.path}.${reference.displayName}`);
 
-  // TODO: Put new feature behind feature flag
-  // re: https://github.com/aws/aws-cdk/pull/11918
   const looseReferenceFeatureEnabled = FeatureFlags.of(consumer).isEnabled(cxapi.LOOSE_CROSS_STACK_REF);
+  if (looseReferenceFeatureEnabled) {
+    return createParameterStoreGet(consumer, reference);
+  }
 
-  return createParameterStoreGet(consumer, reference);
-  //return createImportValue(reference);
+  return createImportValue(reference);
 }
 
 /**
