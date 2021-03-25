@@ -170,15 +170,19 @@ function findAllReferences(root: IConstruct) {
  */
 
 function createParameterStoreGet(consumer: Stack, reference: Reference): IResolvable {
-  const stack = Stack.of(reference.target);
-  new ssm.StringParameter(stack, 'parameter', {
-    parameterName: `/cdk/${stack.stackName}/${reference.displayName}`,
+
+  const providerStack = Stack.of(reference.target);
+  consumer.addDependency(providerStack);
+
+  const parameterName = `/cdk/${providerStack.stackName}/${reference.displayName}`;
+
+  new ssm.StringParameter(providerStack, 'parameter', {
+    parameterName,
     stringValue: Token.asString(reference),
   });
-  //new ssm.StringParameter.valueForStringParameter(stack, `/cdk/${stack.stackName}/${reference.displayName}`);
   return new CfnParameter(consumer, 'id', {
     type: 'AWS::SSM::Parameter::Value<String>',
-    default: `/cdk/${stack.stackName}/${reference.displayName}`,
+    default: parameterName,
   });
 }
 
