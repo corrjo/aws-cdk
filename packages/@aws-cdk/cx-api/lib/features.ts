@@ -104,7 +104,11 @@ export const S3_GRANT_WRITE_WITHOUT_ACL = '@aws-cdk/aws-s3:grantWriteWithoutAcl'
  */
 export const ECS_REMOVE_DEFAULT_DESIRED_COUNT = '@aws-cdk/aws-ecs-patterns:removeDefaultDesiredCount';
 
-// TODO WRITEME
+/**
+ * Change the behavior of cross stack references, instead of creating and consuming
+ * Cloudformation exports, use SSM parameter store to put values to be consumed as stack
+ * parameters
+ */
 export const LOOSE_CROSS_STACK_REF = '@aws-cdk/core:looseCrossStackRefs';
 
 /**
