@@ -8,6 +8,7 @@ import * as cxapi from '@aws-cdk/cx-api';
 import { CfnElement } from '../cfn-element';
 import { CfnOutput } from '../cfn-output';
 import { CfnParameter } from '../cfn-parameter';
+import { CfnResource } from '../cfn-resource';
 import { IConstruct } from '../construct-compat';
 import { FeatureFlags } from '../feature-flags';
 import { Names } from '../names';
@@ -18,8 +19,6 @@ import { Token, Tokenization } from '../token';
 import { CfnReference } from './cfn-reference';
 import { Intrinsic } from './intrinsic';
 import { findTokens } from './resolve';
-import { Resource } from '../resource';
-import { CfnResource } from '../cfn-resource';
 
 /**
  * This is called from the App level to resolve all references defined. Each
@@ -185,13 +184,9 @@ function createParameterStoreGet(consumer: Stack, reference: Reference): IResolv
       name: parameterName,
       type: 'String',
       value: Token.asString(reference),
-    }
+    },
   });
 
-  //new ssm.StringParameter(providerStack, 'parameter', {
-    //parameterName,
-    //stringValue: Token.asString(reference),
-  //});
   return new CfnParameter(consumer, 'id', {
     type: 'AWS::SSM::Parameter::Value<String>',
     default: parameterName,
