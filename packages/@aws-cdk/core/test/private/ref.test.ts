@@ -1,23 +1,23 @@
-import * as s3 from '@aws-cdk/aws-s3';
+//import * as s3 from '@aws-cdk/aws-s3';
 import { expect as expectCDK, haveResource } from '@aws-cdk/assert';
 import { App, Construct, Stack, StackProps, CfnOutput } from '../../lib';
 
 interface extraProps extends StackProps {
-  otherProp: s3.Bucket;
+  otherProp: string;
 }
 
 class StackOne extends Stack {
-  bucket: s3.Bucket;
+  toShare: string;
   constructor(scope: Construct, id: string, props?: extraProps) {
     super(scope, id, props);
-    this.bucket = new s3.Bucket(this, 'bucket');
+    this.toShare = 'Some Cross Stack Value';
   }
 }
 class StackTwo extends Stack {
-  bucket: s3.IBucket;
+  valueFromStackOne: string;
   constructor(scope: Construct, id: string, props: extraProps) {
     super(scope, id, props);
-    this.bucket = s3.Bucket.fromBucketName(this, 'bucket', props.otherProp.bucketName);
+    this.valueFromStackOne = props.otherProp;
   }
 }
 
@@ -25,8 +25,8 @@ test('Cross stack references create Parameters', () => {
   const app = new App();
   // WHEN
   const stackOne = new StackOne(app, 'MyTestStackOne');
-  const stackTwo = new StackTwo(app, 'MyTestStackTwo', { otherProp: stackOne.bucket });
-  new CfnOutput(stackTwo, 'TestOutput', { value: stackTwo.bucket.bucketArn });
+  const stackTwo = new StackTwo(app, 'MyTestStackTwo', { otherProp: stackOne.toShare});
+  new CfnOutput(stackTwo, 'TestOutput', { value: stackTwo.valueFromStackOne });
   // THEN
   expectCDK(stackOne).to(haveResource('AWS::SSM::Parameter'));
 });
