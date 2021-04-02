@@ -28,8 +28,7 @@ nodeunitShim({
       const app = new App();
       // WHEN
       const stackOne = new StackOne(app, 'MyTestStackOne');
-      const stackTwo = new StackTwo(app, 'MyTestStackTwo', { otherProp: stackOne.toShare });
-      new CfnOutput(stackTwo, 'TestOutput', { value: stackTwo.valueFromStackOne });
+      new StackTwo(app, 'MyTestStackTwo', { otherProp: stackOne.toShare });
       const cfn = toCloudFormation(stackOne);
       test.deepEqual(cfn, { });
       test.done();
